@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { ConversationListItem as ConversationItemType, StatusFilter } from '../../hooks/useConversations'
 import { ConversationListItem } from './ConversationListItem'
-import { SearchIcon, RefreshCwIcon } from '../icons'
+import { SearchIcon, RefreshCwIcon, PlusIcon, XIcon } from '../icons'
+import { useBrand } from '../../context/BrandContext'
 
 interface ConversationListProps {
   conversations: ConversationItemType[]
@@ -11,8 +12,9 @@ interface ConversationListProps {
   onStatusFilterChange: (status: StatusFilter) => void
   loading: boolean
   error: string | null
-  onRefresh: () => void
+  onRetry?: () => void
   brandName?: string
+  onCreateTestConversation?: (brandId: string, customerName: string, firstMessage: string) => Promise<void>
 }
 
 const STATUS_TABS: { label: string; value: StatusFilter }[] = [
@@ -31,10 +33,48 @@ export function ConversationList({
   onStatusFilterChange,
   loading,
   error,
-  onRefresh,
+  onRetry,
   brandName = 'Inbox',
+  onCreateTestConversation,
 }: ConversationListProps) {
+  const { brands, selectedBrand } = useBrand()
   const [searchQuery, setSearchQuery] = useState('')
+
+  // New test conversation modal state
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalBrandId, setModalBrandId] = useState(selectedBrand?.id || '')
+  const [modalCustomerName, setModalCustomerName] = useState('Alice Demo')
+  const [modalMessage, setModalMessage] = useState('My order was delivered but the bottle is broken. What can I do?')
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+
+  const handleOpenModal = () => {
+    setModalBrandId(selectedBrand?.id || brands[0]?.id || '')
+    setModalCustomerName('Alice Demo')
+    setModalMessage('My order was delivered but the bottle is broken. What can I do?')
+    setCreateError(null)
+    setModalOpen(true)
+  }
+
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!onCreateTestConversation) return
+    if (!modalCustomerName.trim() || !modalMessage.trim() || !modalBrandId) {
+      setCreateError('Please complete all required fields.')
+      return
+    }
+
+    setCreating(true)
+    setCreateError(null)
+    try {
+      await onCreateTestConversation(modalBrandId, modalCustomerName.trim(), modalMessage.trim())
+      setModalOpen(false)
+    } catch (err) {
+      setCreateError((err as Error).message || 'Failed to create test conversation')
+    } finally {
+      setCreating(false)
+    }
+  }
 
   const filteredConversations = conversations.filter((c) => {
     if (!searchQuery.trim()) return true
@@ -50,7 +90,7 @@ export function ConversationList({
   return (
     <div className="w-80 md:w-88 bg-white border-r border-[#eaecf0] flex flex-col h-full flex-shrink-0 select-none">
       {/* Top Header Section with 16px padding and 16px vertical gap */}
-      <div className="p-4 border-b border-[#eaecf0] flex flex-col gap-4 bg-white">
+      <div className="p-4 border-b border-[#eaecf0] flex flex-col gap-3 bg-white">
         {/* Title row */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -59,17 +99,20 @@ export function ConversationList({
               {conversations.length}
             </span>
           </div>
-
-          <button
-            onClick={onRefresh}
-            title="Refresh tickets"
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-          >
-            <RefreshCwIcon className={`w-4 h-4 ${loading ? 'animate-spin text-[#00a86b]' : ''}`} />
-          </button>
         </div>
 
-        {/* Search bar: 36px height, icon at left 12px, padding-left 36px */}
+        {/* "New test conversation" button in inbox header */}
+        <button
+          type="button"
+          onClick={handleOpenModal}
+          id="new-test-conversation-btn"
+          className="w-full h-8 px-3 inline-flex items-center justify-center gap-1.5 bg-[#1b2133] hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer"
+        >
+          <PlusIcon className="w-3.5 h-3.5" />
+          <span>New test conversation</span>
+        </button>
+
+        {/* Search bar */}
         <div className="relative w-full">
           <SearchIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
@@ -89,7 +132,7 @@ export function ConversationList({
           )}
         </div>
 
-        {/* Status filter tabs: flex row with 8px gap, wrap if needed, each chip padded 4px 12px with pill radius */}
+        {/* Status filter tabs */}
         <div className="flex flex-wrap gap-2">
           {STATUS_TABS.map((tab) => {
             const isActive = statusFilter === tab.value
@@ -134,36 +177,123 @@ export function ConversationList({
             </div>
             <p className="text-xs text-rose-700 font-semibold">Failed to load tickets</p>
             <p className="text-[11px] text-slate-500 max-w-[200px]">{error}</p>
-            <button
-              onClick={onRefresh}
-              className="mt-2 h-9 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300 shadow-2xs transition-colors cursor-pointer"
-            >
-              Retry
-            </button>
+            {onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="mt-2 h-9 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300 shadow-2xs transition-colors cursor-pointer"
+              >
+                Try again
+              </button>
+            )}
           </div>
         ) : filteredConversations.length === 0 ? (
-          /* Empty state: centered, 24px padding, 8px gap between title and subtitle */
           <div className="p-6 text-center flex flex-col items-center justify-center gap-2 text-slate-500">
             <p className="text-xs font-semibold text-slate-800">
               {searchQuery ? 'No matching tickets' : 'No tickets found'}
             </p>
             <p className="text-[11px] text-slate-400">
-              {statusFilter !== 'all'
-                ? `No ${statusFilter} conversations.`
-                : 'Customer inquiries will appear here.'}
+              {searchQuery
+                ? 'Try adjusting your search criteria'
+                : 'Click "New test conversation" to start a fresh customer inquiry.'}
             </p>
           </div>
         ) : (
-          filteredConversations.map((conv) => (
+          filteredConversations.map((item) => (
             <ConversationListItem
-              key={conv.id}
-              conversation={conv}
-              isSelected={conv.id === selectedId}
+              key={item.id}
+              conversation={item}
+              isSelected={item.id === selectedId}
               onSelect={onSelect}
             />
           ))
         )}
       </div>
+
+      {/* New Test Conversation Dialog */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900">New Test Conversation</h3>
+              <button
+                onClick={() => setModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateSubmit} className="p-5 flex flex-col gap-4 text-xs">
+              {createError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg">
+                  {createError}
+                </div>
+              )}
+
+              {/* Brand selection */}
+              <div className="flex flex-col gap-1">
+                <label className="font-semibold text-slate-700">Brand</label>
+                <select
+                  value={modalBrandId}
+                  onChange={(e) => setModalBrandId(e.target.value)}
+                  className="h-9 px-3 rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#00a86b]"
+                >
+                  {brands.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Customer Name */}
+              <div className="flex flex-col gap-1">
+                <label className="font-semibold text-slate-700">Customer Name</label>
+                <input
+                  type="text"
+                  value={modalCustomerName}
+                  onChange={(e) => setModalCustomerName(e.target.value)}
+                  placeholder="e.g. Alice Demo"
+                  className="h-9 px-3 rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#00a86b]"
+                  required
+                />
+              </div>
+
+              {/* First customer message */}
+              <div className="flex flex-col gap-1">
+                <label className="font-semibold text-slate-700">First Customer Message</label>
+                <textarea
+                  rows={4}
+                  value={modalMessage}
+                  onChange={(e) => setModalMessage(e.target.value)}
+                  placeholder="Enter initial customer query…"
+                  className="p-3 rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#00a86b] resize-none"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  className="px-3 py-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-medium cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creating}
+                  className="px-4 py-2 bg-[#00a86b] hover:bg-[#00915c] text-white font-semibold rounded-lg shadow-2xs cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                  {creating && <RefreshCwIcon className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{creating ? 'Creating…' : 'Start Conversation'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { Conversation, ConversationStatus, Customer, Order } from '../types/database'
+import type { Brand, Conversation, ConversationStatus, Customer, Order } from '../types/database'
 import { MOCK_DETAILS } from '../lib/mockData'
 
 export interface ConversationDetail extends Conversation {
   customers: Customer
   orders: Order | null
+  brands?: Brand | null
 }
 
 export function useConversationDetail(conversationId: string | null) {
@@ -23,7 +24,7 @@ export function useConversationDetail(conversationId: string | null) {
     try {
       const { data, error: err } = await supabase
         .from('conversations')
-        .select('*, customers(*), orders(*)')
+        .select('*, customers(*), orders(*), brands(*)')
         .eq('id', conversationId)
         .single()
 

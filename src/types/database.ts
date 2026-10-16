@@ -104,9 +104,10 @@ export interface Order {
   currency:     string       // ISO 4217, e.g. 'USD'
   items_json:   OrderLineItem[]
   notes:        string | null
-  ordered_at:   string
-  created_at:   string
-  updated_at:   string
+  ordered_at:     string
+  delivery_date?: string | null
+  created_at:     string
+  updated_at:     string
 }
 
 // ── conversations ─────────────────────────────────────────────
@@ -145,13 +146,15 @@ export interface Message {
   conversation_id: string
   brand_id:        string
   role:            MessageRole
+  sender_type?:    'customer' | 'agent' | string
+  source?:         'customer' | 'ai_approved' | 'manual' | string
   author_id:       string | null    // profiles.id (null for customer / bot messages)
   content:         string
   metadata_json:   MessageMetadata
   created_at:      string
 }
 
-// ── ai_reply_logs ─────────────────────────────────────────────
+// ── ai_reply_logs (legacy / compatibility) ───────────────────
 
 export interface AiPromptMessage {
   role:    'system' | 'user' | 'assistant'
@@ -174,20 +177,59 @@ export interface AiReplyLog {
   updated_at:         string
 }
 
+// ── ai_generations (Part 1 assessment) ────────────────────────
+
+export interface AiGenerationSnippet {
+  id:          string
+  title:       string
+  policy_type: string
+  category?:   string
+  brand?:      string
+  content:     string
+}
+
+export interface AiGeneration {
+  id:                  string
+  conversation_id:     string
+  brand_id:            string
+  trigger_message_id:  string | null
+  customer_message:    string
+  retrieved_context:   AiGenerationSnippet[]
+  ai_response:         string
+  status:              'ok' | 'needs_review' | 'no_knowledge' | 'approved'
+  reason:              string | null
+  model:               string
+  prompt_tokens:       number | null
+  completion_tokens:   number | null
+  latency_ms:          number | null
+  edited_response:     string | null
+  final_response:      string | null
+  final_message_id:    string | null
+  approved_by:         string | null
+  approved_at:         string | null
+  created_at:          string
+}
+
 // ── Edge Function request / response shapes ───────────────────
 
 export interface AiReplyRequest {
   conversation_id: string
-  brand_id:        string
+  brand_id?:       string
   action?:         'suggest' | 'regenerate' | 'policy_check'
 }
 
 export interface AiReplyResponse {
-  log_id:                       string        // ai_reply_logs.id
+  generation_id:                string
   draft:                        string
-  model:                        string
-  sources:                      string[]      // policy titles that were used
+  snippets:                     AiGenerationSnippet[]
+  status:                       'ok' | 'needs_review' | 'no_knowledge'
+  reason:                       string | null
+  // Compatibility fields
+  log_id?:                      string
+  model?:                       string
+  sources?:                     string[]
   requires_human_verification?: boolean
   verification_reason?:         string | null
   confidence_score?:            number
 }
+

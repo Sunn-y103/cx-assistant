@@ -14,7 +14,6 @@ import {
   BookOpenIcon,
   SearchIcon,
   PlusIcon,
-  RefreshCwIcon,
   SparklesIcon,
 } from '../components/icons'
 
@@ -30,7 +29,7 @@ const CATEGORY_TABS: { label: string; value: PolicyCategory | 'all' }[] = [
 ]
 
 export default function KnowledgeBasePage() {
-  const { selectedBrand } = useBrand()
+  const { brands, selectedBrand, setSelectedBrand } = useBrand()
   const {
     policies,
     loading,
@@ -164,16 +163,22 @@ export default function KnowledgeBasePage() {
               </div>
             </div>
 
-            {/* Actions: Refresh & Create New Policy */}
+            {/* Actions: Brand picker & Create New Policy */}
             <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                type="button"
-                onClick={refresh}
-                title="Refresh knowledge base"
-                className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200 shadow-2xs bg-white"
+              <select
+                value={selectedBrand?.id || ''}
+                onChange={(e) => {
+                  const b = brands.find((brand) => brand.id === e.target.value)
+                  if (b) setSelectedBrand(b)
+                }}
+                className="h-9 px-3 rounded-lg border border-slate-300 bg-white text-xs font-semibold text-slate-800 shadow-2xs focus:outline-none focus:ring-1 focus:ring-[#00a86b]"
               >
-                <RefreshCwIcon className={`w-4 h-4 ${loading ? 'animate-spin text-[#00a86b]' : ''}`} />
-              </button>
+                {brands.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
 
               <button
                 type="button"

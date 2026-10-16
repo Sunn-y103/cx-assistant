@@ -99,6 +99,17 @@ export default function LoginPage() {
             >
               {loading ? 'Signing in...' : 'Sign In to Workspace'}
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setEmail('reviewer@datastraw.com')
+                setPassword('DatastrawDemo2024!')
+              }}
+              className="w-full h-8 px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs rounded-lg transition-colors cursor-pointer flex items-center justify-center"
+            >
+              Fill Reviewer Demo Credentials
+            </button>
           </form>
 
           <div className="mt-6 border-t border-slate-100 pt-4 text-center">

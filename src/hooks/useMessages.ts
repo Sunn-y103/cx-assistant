@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { Message, MessageMetadata } from '../types/database'
+import type { Message, MessageMetadata, MessageRole } from '../types/database'
 import { MOCK_MESSAGES } from '../lib/mockData'
+import { approveAiGeneration } from '../services/ai'
 
-/** Extra metadata callers can attach to a sent agent message. */
+/** Options when sending a message */
 export interface MessageSendOptions {
-  /** draft_type distinguishes how the message was composed */
+  sender_type?: 'customer' | 'agent'
+  role?: MessageRole
+  source?: 'customer' | 'ai_approved' | 'manual'
+  generation_id?: string
+  edited_response?: string | null
   draft_type?: 'manual' | 'ai_accepted' | 'ai_edited'
-  /** The ai_reply_logs.id that produced the draft, if any */
   ai_log_id?: string
-  /** Whether the agent edited the AI draft before sending */
   was_edited?: boolean
-  /** Mark as a simulated demo send (never a real customer delivery) */
   is_demo_send?: boolean
 }
 
@@ -66,54 +68,86 @@ export function useMessages(conversationId: string | null, brandId: string | nul
       setSending(true)
       setError(null)
 
+      const senderType = options.sender_type ?? (options.role === 'customer' ? 'customer' : 'agent')
+      const role: MessageRole = options.role ?? (senderType === 'customer' ? 'customer' : 'agent')
+      const source = options.source ?? (senderType === 'customer' ? 'customer' : 'manual')
+
       const extra: MessageMetadata = {
         ...(options.draft_type ? { draft_type: options.draft_type } : {}),
+        ...(options.generation_id ? { generation_id: options.generation_id } : {}),
         ...(options.ai_log_id ? { ai_log_id: options.ai_log_id } : {}),
         ...(options.was_edited !== undefined ? { was_edited: options.was_edited } : {}),
         ...(options.is_demo_send ? { is_demo_send: true } : {}),
       }
+
+      // 1. Optimistic Update: Add message immediately to the UI thread
+      const tempId = `optimistic-${Date.now()}`
+      const optimisticMsg: Message = {
+        id: tempId,
+        conversation_id: conversationId,
+        brand_id: brandId,
+        role,
+        sender_type: senderType,
+        source,
+        author_id: null,
+        content,
+        metadata_json: extra,
+        created_at: new Date().toISOString(),
+      }
+      setMessages((prev) => [...prev, optimisticMsg])
 
       try {
         const {
           data: { user },
         } = await supabase.auth.getUser()
 
-        const { error: insertErr } = await supabase.from('messages').insert({
-          conversation_id: conversationId,
-          brand_id: brandId,
-          role: 'agent',
-          author_id: user?.id ?? null,
-          content,
-          metadata_json: extra,
-        })
+        const { data: insertedMsg, error: insertErr } = await supabase
+          .from('messages')
+          .insert({
+            conversation_id: conversationId,
+            brand_id: brandId,
+            role,
+            sender_type: senderType,
+            source,
+            author_id: senderType === 'agent' ? user?.id ?? null : null,
+            content,
+            metadata_json: extra,
+          })
+          .select()
+          .single()
+
         if (insertErr) throw insertErr
 
-        // Keep last_message_at current so the conversation list sorts correctly
+        // 2. If this was an approved AI generation, log it in ai_generations
+        if (options.generation_id && source === 'ai_approved') {
+          await approveAiGeneration({
+            generationId: options.generation_id,
+            editedResponse: options.edited_response,
+            finalResponse: content,
+            finalMessageId: insertedMsg?.id,
+            userId: user?.id,
+          })
+        }
+
+        // 3. Keep last_message_at current so the conversation list sorts correctly
         await supabase
           .from('conversations')
           .update({ last_message_at: new Date().toISOString() })
           .eq('id', conversationId)
 
-        await fetchMessages()
-      } catch {
-        // In offline/demo mode, append to local message list
-        const newMsg: Message = {
-          id: `local-${Date.now()}`,
-          conversation_id: conversationId,
-          brand_id: brandId,
-          role: 'agent',
-          author_id: null,
-          content,
-          metadata_json: extra,
-          created_at: new Date().toISOString(),
+        // Replace optimistic message with actual persisted record
+        if (insertedMsg) {
+          setMessages((prev) => prev.map((m) => (m.id === tempId ? (insertedMsg as Message) : m)))
         }
-        setMessages((prev) => [...prev, newMsg])
+      } catch (err) {
+        console.error('[useMessages] sendMessage failed:', err)
+        // Keep optimistic message in demo/offline mode
       } finally {
         submittingRef.current = false
         setSending(false)
       }
     },
-    [conversationId, brandId, fetchMessages],
+    [conversationId, brandId],
   )
 
   return { messages, loading, error, sending, sendMessage, refresh: fetchMessages }

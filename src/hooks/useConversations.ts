@@ -23,12 +23,13 @@ export function useConversations(
   refreshKey = 0,
 ) {
   const [items, setItems] = useState<ConversationListItem[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState<boolean>(Boolean(brandId))
   const [error, setError] = useState<string | null>(null)
 
   const fetch = useCallback(async () => {
     if (!brandId) {
       setItems([])
+      setLoading(false)
       return
     }
     setLoading(true)

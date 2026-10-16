@@ -1,14 +1,10 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useBrand } from '../../context/BrandContext'
 import {
-  SearchIcon,
   InboxIcon,
-  TicketIcon,
+  UserIcon,
   BookOpenIcon,
-  UsersIcon,
-  ChatIcon,
   ChevronDownIcon,
-  RefreshCwIcon,
 } from '../icons'
 
 interface SidebarProps {
@@ -20,6 +16,7 @@ export function Sidebar({ className = '' }: SidebarProps) {
   const location = useLocation()
 
   const isInbox = location.pathname.startsWith('/inbox') || location.pathname === '/'
+  const isCustomerDetails = location.pathname.startsWith('/customers')
   const isKnowledgeBase = location.pathname.startsWith('/knowledge-base')
 
   // Derive initial avatar abbreviation
@@ -60,10 +57,11 @@ export function Sidebar({ className = '' }: SidebarProps) {
             <div className="flex items-center justify-between text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">
               <span className="truncate">Failed to load</span>
               <button
+                type="button"
                 onClick={refresh}
                 className="text-[11px] text-red-700 hover:text-red-900 underline font-semibold flex-shrink-0 cursor-pointer"
               >
-                <RefreshCwIcon className="w-3 h-3 inline" />
+                Try again
               </button>
             </div>
           ) : brands.length === 0 ? (
@@ -95,25 +93,8 @@ export function Sidebar({ className = '' }: SidebarProps) {
         </div>
       </div>
 
-      {/* 2. Search Box with ⌘ K shortcut badge */}
-      <div className="px-4 pt-3 pb-2">
-        <div className="relative">
-          <SearchIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            readOnly
-            placeholder="Search"
-            className="w-full h-9 bg-white border border-[#e5e7eb] rounded-lg pl-9 pr-12 text-xs text-slate-700 placeholder-slate-400 shadow-2xs focus:outline-none cursor-pointer"
-          />
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none">
-            <kbd className="text-[10px] font-sans text-slate-400 font-medium">⌘</kbd>
-            <kbd className="text-[10px] font-sans text-slate-400 font-medium">K</kbd>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Main Navigation List */}
-      <nav className="flex-1 px-4 py-2 flex flex-col gap-1 overflow-y-auto min-h-0">
+      {/* 2. Main Navigation List */}
+      <nav className="flex-1 px-4 py-3 flex flex-col gap-1 overflow-y-auto min-h-0">
         <Link
           to="/inbox"
           className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs transition-colors ${
@@ -127,11 +108,15 @@ export function Sidebar({ className = '' }: SidebarProps) {
         </Link>
 
         <Link
-          to="/inbox"
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium transition-colors"
+          to="/customers"
+          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs transition-colors ${
+            isCustomerDetails
+              ? 'bg-[#edeef2] text-slate-900 font-semibold'
+              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
+          }`}
         >
-          <TicketIcon className="w-4 h-4 text-slate-600 flex-shrink-0" />
-          <span className="flex-1">Tickets</span>
+          <UserIcon className="w-4 h-4 text-slate-600 flex-shrink-0" />
+          <span className="flex-1">Customer Details</span>
         </Link>
 
         <Link
@@ -145,78 +130,18 @@ export function Sidebar({ className = '' }: SidebarProps) {
           <BookOpenIcon className="w-4 h-4 text-slate-600 flex-shrink-0" />
           <span className="flex-1">Knowledge Base</span>
         </Link>
-
-        <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-slate-600 hover:bg-slate-100 font-medium cursor-pointer transition-colors">
-          <UsersIcon className="w-4 h-4 text-slate-600 flex-shrink-0" />
-          <span className="flex-1">Customers</span>
-        </div>
-
-        {/* Section: Conversation */}
-        <div className="pt-4">
-          <div className="text-[11px] uppercase tracking-[0.06em] text-slate-400 font-bold px-3 pb-2">
-            Conversation
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 cursor-pointer transition-colors">
-              <svg className="w-4 h-4 text-slate-500 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-              </svg>
-              <span className="truncate flex-1">Voice Support</span>
-              <span className="w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
-                1
-              </span>
-            </div>
-
-            <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 cursor-pointer transition-colors">
-              <ChatIcon className="w-4 h-4 text-slate-500 flex-shrink-0" />
-              <span className="truncate flex-1">Live Chat</span>
-              <span className="text-[10px] text-slate-400 font-medium px-2 py-0.5 bg-slate-100 rounded flex-shrink-0">
-                0
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Section: Pinned Tickets */}
-        <div className="pt-4">
-          <div className="flex items-center justify-between px-3 pb-2">
-            <span className="text-[11px] uppercase tracking-[0.06em] text-slate-400 font-bold">
-              Pinned Tickets
-            </span>
-            <span className="text-[10px] text-slate-400 hover:text-slate-600 cursor-pointer">
-              Unpin All
-            </span>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-slate-100 cursor-pointer transition-colors">
-              <span className="w-2 h-2 rounded-full bg-[#00a86b] flex-shrink-0" />
-              <span className="truncate font-mono text-[11px]">#TC-192 refund delay</span>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-slate-100 cursor-pointer transition-colors">
-              <span className="w-2 h-2 rounded-full bg-[#00a86b] flex-shrink-0" />
-              <span className="truncate font-mono text-[11px]">#TC-191 payment issue</span>
-            </div>
-          </div>
-        </div>
       </nav>
 
-      {/* 4. Footer: Powered by & Collapse */}
-      <div className="mt-auto px-4 py-3 border-t border-[#eaecf0] bg-white flex items-center justify-between text-xs text-slate-400">
-        <div className="flex flex-col">
-          <span className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">
-            Powered by
-          </span>
-          <span className="font-bold text-slate-800 text-xs tracking-tight">
-            datastraw cx
-          </span>
-        </div>
-        <div className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 cursor-pointer" title="Collapse sidebar">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-          </svg>
-        </div>
+      {/* 3. Footer: Favicon logo & Powered by */}
+      <div className="mt-auto px-4 py-3 border-t border-[#eaecf0] bg-white flex items-center gap-2">
+        <img
+          src="/favicon.svg"
+          alt="Logo"
+          className="w-6 h-6 rounded flex-shrink-0"
+        />
+        <span className="text-[11px] text-slate-400 font-medium tracking-tight">
+          Powered by
+        </span>
       </div>
     </aside>
   )
