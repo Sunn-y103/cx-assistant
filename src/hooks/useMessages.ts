@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import type { Message, MessageMetadata, MessageRole } from '../types/database'
 import { MOCK_MESSAGES } from '../lib/mockData'
 import { approveAiGeneration } from '../services/ai'
+import { queryClient } from '../App'
 
 /** Options when sending a message */
 export interface MessageSendOptions {
@@ -17,47 +19,55 @@ export interface MessageSendOptions {
   is_demo_send?: boolean
 }
 
+const MESSAGES_COLUMNS =
+  'id, conversation_id, brand_id, role, sender_type, source, author_id, content, metadata_json, created_at'
+
+export async function fetchMessagesFn(conversationId: string): Promise<Message[]> {
+  try {
+    const { data, error: err } = await supabase
+      .from('messages')
+      .select(MESSAGES_COLUMNS)
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true })
+      .limit(50)
+
+    if (err) throw err
+    if (!data || data.length === 0) {
+      return MOCK_MESSAGES[conversationId] || []
+    }
+    return data as Message[]
+  } catch {
+    return MOCK_MESSAGES[conversationId] || []
+  }
+}
+
+export function prefetchConversationMessages(conversationId: string) {
+  if (!conversationId) return
+  queryClient.prefetchQuery({
+    queryKey: ['messages', conversationId],
+    queryFn: () => fetchMessagesFn(conversationId),
+    staleTime: 1000 * 60 * 3,
+  })
+}
+
 export function useMessages(conversationId: string | null, brandId: string | null) {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
   // Ref-level guard: prevents duplicate concurrent submissions
   const submittingRef = useRef(false)
 
-  const fetchMessages = useCallback(async () => {
-    if (!conversationId || !brandId) {
-      setMessages([])
-      return
-    }
-    setLoading(true)
-    setError(null)
-    try {
-      const { data, error: err } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true })
-
-      if (err) throw err
-      if (!data || data.length === 0) {
-        const fallback = MOCK_MESSAGES[conversationId] || []
-        setMessages(fallback)
-        return
-      }
-      setMessages(data as Message[])
-    } catch {
-      // Offline fallback
-      const fallback = MOCK_MESSAGES[conversationId] || []
-      setMessages(fallback)
-    } finally {
-      setLoading(false)
-    }
-  }, [conversationId, brandId])
-
-  useEffect(() => {
-    fetchMessages()
-  }, [fetchMessages])
+  const {
+    data: messages = [],
+    isLoading: loading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: ['messages', conversationId],
+    queryFn: () => (conversationId ? fetchMessagesFn(conversationId) : Promise.resolve([])),
+    enabled: Boolean(conversationId && brandId),
+    placeholderData: keepPreviousData,
+    staleTime: 1000 * 60 * 3,
+  })
 
   const sendMessage = useCallback(
     async (content: string, options: MessageSendOptions = {}) => {
@@ -66,7 +76,7 @@ export function useMessages(conversationId: string | null, brandId: string | nul
       if (submittingRef.current) return
       submittingRef.current = true
       setSending(true)
-      setError(null)
+      setSendError(null)
 
       const senderType = options.sender_type ?? (options.role === 'customer' ? 'customer' : 'agent')
       const role: MessageRole = options.role ?? (senderType === 'customer' ? 'customer' : 'agent')
@@ -80,7 +90,7 @@ export function useMessages(conversationId: string | null, brandId: string | nul
         ...(options.is_demo_send ? { is_demo_send: true } : {}),
       }
 
-      // 1. Optimistic Update: Add message immediately to the UI thread
+      // 1. Optimistic Update: Add message immediately to the UI thread via React Query cache
       const tempId = `optimistic-${Date.now()}`
       const optimisticMsg: Message = {
         id: tempId,
@@ -94,7 +104,11 @@ export function useMessages(conversationId: string | null, brandId: string | nul
         metadata_json: extra,
         created_at: new Date().toISOString(),
       }
-      setMessages((prev) => [...prev, optimisticMsg])
+
+      queryClient.setQueryData<Message[]>(['messages', conversationId], (prev) => [
+        ...(prev || []),
+        optimisticMsg,
+      ])
 
       try {
         const {
@@ -113,7 +127,7 @@ export function useMessages(conversationId: string | null, brandId: string | nul
             content,
             metadata_json: extra,
           })
-          .select()
+          .select(MESSAGES_COLUMNS)
           .single()
 
         if (insertErr) throw insertErr
@@ -135,13 +149,15 @@ export function useMessages(conversationId: string | null, brandId: string | nul
           .update({ last_message_at: new Date().toISOString() })
           .eq('id', conversationId)
 
-        // Replace optimistic message with actual persisted record
+        // Replace optimistic message with actual persisted record in cache
         if (insertedMsg) {
-          setMessages((prev) => prev.map((m) => (m.id === tempId ? (insertedMsg as Message) : m)))
+          queryClient.setQueryData<Message[]>(['messages', conversationId], (prev) =>
+            (prev || []).map((m) => (m.id === tempId ? (insertedMsg as Message) : m)),
+          )
         }
       } catch (err) {
         console.error('[useMessages] sendMessage failed:', err)
-        // Keep optimistic message in demo/offline mode
+        setSendError((err as Error).message || 'Failed to send')
       } finally {
         submittingRef.current = false
         setSending(false)
@@ -150,5 +166,12 @@ export function useMessages(conversationId: string | null, brandId: string | nul
     [conversationId, brandId],
   )
 
-  return { messages, loading, error, sending, sendMessage, refresh: fetchMessages }
+  return {
+    messages,
+    loading,
+    error: sendError || (queryError ? (queryError as Error).message : null),
+    sending,
+    sendMessage,
+    refresh: refetch,
+  }
 }

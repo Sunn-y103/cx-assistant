@@ -8,6 +8,7 @@ interface ConversationListProps {
   conversations: ConversationItemType[]
   selectedId: string | null
   onSelect: (id: string) => void
+  onPrefetch?: (id: string) => void
   statusFilter: StatusFilter
   onStatusFilterChange: (status: StatusFilter) => void
   loading: boolean
@@ -29,6 +30,7 @@ export function ConversationList({
   conversations,
   selectedId,
   onSelect,
+  onPrefetch,
   statusFilter,
   onStatusFilterChange,
   loading,
@@ -205,6 +207,7 @@ export function ConversationList({
               conversation={item}
               isSelected={item.id === selectedId}
               onSelect={onSelect}
+              onPrefetch={onPrefetch}
             />
           ))
         )}

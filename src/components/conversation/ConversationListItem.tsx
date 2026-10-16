@@ -6,6 +6,7 @@ interface ConversationListItemProps {
   conversation: ConversationItemType
   isSelected: boolean
   onSelect: (id: string) => void
+  onPrefetch?: (id: string) => void
 }
 
 function formatRelativeTime(isoString: string): string {
@@ -77,6 +78,7 @@ export function ConversationListItem({
   conversation,
   isSelected,
   onSelect,
+  onPrefetch,
 }: ConversationListItemProps) {
   const statusInfo = getStatusBadge(conversation.status)
   const initial = conversation.customer_name ? conversation.customer_name[0].toUpperCase() : 'C'
@@ -84,6 +86,7 @@ export function ConversationListItem({
   return (
     <div
       onClick={() => onSelect(conversation.id)}
+      onMouseEnter={() => onPrefetch?.(conversation.id)}
       className={`px-4 py-3 border-b cursor-pointer transition-colors duration-150 ${
         isSelected
           ? 'bg-[#f4f7fb] border-l-4 border-l-[#00a86b] pl-[13px] border-b-slate-200'

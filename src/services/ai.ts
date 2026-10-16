@@ -114,9 +114,10 @@ export async function getAiGenerations(conversationId: string): Promise<AiGenera
   try {
     const { data, error } = await supabase
       .from('ai_generations')
-      .select('*')
+      .select('id, conversation_id, brand_id, customer_message, retrieved_context, ai_response, status, reason, model, latency_ms, edited_response, final_response, created_at')
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: false })
+      .limit(20)
 
     if (error) throw error
     return (data as AiGeneration[]) ?? []

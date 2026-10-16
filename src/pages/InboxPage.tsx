@@ -3,8 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import { useBrand } from '../context/BrandContext'
 import { useConversations } from '../hooks/useConversations'
 import type { StatusFilter } from '../hooks/useConversations'
-import { useConversationDetail } from '../hooks/useConversationDetail'
-import { useMessages } from '../hooks/useMessages'
+import { useConversationDetail, prefetchConversationDetail } from '../hooks/useConversationDetail'
+import { useMessages, prefetchConversationMessages } from '../hooks/useMessages'
 import type { MessageSendOptions } from '../hooks/useMessages'
 import { AppShell } from '../components/layout'
 import { ConversationList, MessageThread } from '../components/conversation'
@@ -18,6 +18,11 @@ export default function InboxPage() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(queryConversationId)
   const [mode, setMode] = useState<'customer' | 'agent'>('agent')
+
+  const handlePrefetch = (id: string) => {
+    prefetchConversationDetail(id)
+    prefetchConversationMessages(id)
+  }
 
   useEffect(() => {
     if (queryConversationId) {
@@ -157,6 +162,7 @@ export default function InboxPage() {
           conversations={conversations}
           selectedId={activeConversationId}
           onSelect={(id) => setSelectedConversationId(id)}
+          onPrefetch={handlePrefetch}
           statusFilter={statusFilter}
           onStatusFilterChange={setStatusFilter}
           loading={convLoading}
